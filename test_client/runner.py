@@ -2,7 +2,7 @@ import shlex
 import subprocess
 from pathlib import Path
 import os
-from .config import CONFIG
+from config import CONFIG
 from contextlib import ContextDecorator
 
 def cmd_init_tftp_server():
@@ -24,22 +24,23 @@ class ClientScenario:
         cls.action = 'push'
         return cls(*args, **kwargs)
 
-    def __init__(self, module_name):
-        self.module_name = module_name
+    def __init__(self, module_path, file_path):
+        self.module_path = module_path
+        self.file_path = file_path
 
     def cmd_action(self,):
         cmd = shlex.split("python {module_path} 127.0.0.1 {action} {filename}".format(
-            filename=self.FILE_DOWNLOAD_NAME,
-            module_path=Path(self.full_module_path),
+            filename=self.file_name,
+            module_path=Path(self.module_path),
             action =self.action
         ))
         print(cmd)
         return cmd
     
     @property
-    def full_module_path(self):
-        return os.path.join(self.SUBMISSIONS_PATH_ROOT, self.module_name)
-    
+    def file_name(self):
+        return os.path.split(self.file_path)[1]
+
     def run(self):
         run_cmd(cmd_init_tftp_server()) and run_cmd(self.cmd_action())
 
@@ -49,5 +50,9 @@ def run_cmd(cmd):
     return subprocess.run(cmd,)
 
 if __name__ == '__main__':
-    file_download_scenario = ClientScenario.download_file('4614_4651_lab1\ -\ Khaled\ Gewily.py')
+    module_name ='4614_4651_lab1\ -\ Khaled\ Gewily.py' 
+    module_path = os.path.join(CONFIG['submission_dir_full_path'], module_name)
+    file_path = os.path.join(os.getcwd(), CONFIG['template_file_name'])
+
+    file_download_scenario = ClientScenario.download_file(module_path=module_path, file_path=file_path)
     file_download_scenario.run()

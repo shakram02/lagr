@@ -1,16 +1,17 @@
 import glob
 import config
+import os 
 
 
 class Submission:
     @classmethod
-    def from_module_name(cls, module_name,):
+    def from_module_path(cls, module_path,):
+        module_name = os.path.split(module_path)[1]
         first_id, second_id = cls.extract_ids(module_name)
-        module_name = module_name
-        return cls(module_name, first_id, second_id)
+        return cls(module_path, first_id, second_id)
 
-    def __init__(self, file_path, first_student, second_student):
-        self.file_path = file_path
+    def __init__(self, module_path, first_student, second_student):
+        self.module_path = module_path
         self.first_student = first_student
         self.second_student = second_student
 
@@ -23,6 +24,6 @@ class Submission:
 
 def submissions_from_directory(submission_dir_full_path):
     return [
-        Submission.from_module_name(module) 
-        for module in glob.glob(submission_dir_full_path)
+        Submission.from_module_path(module_path) 
+        for module_path in glob.glob(submission_dir_full_path)
     ]
