@@ -14,6 +14,9 @@ class Submission:
         self.module_path = module_path
         self.first_student = first_student
         self.second_student = second_student
+    
+    def __str__(self):
+        return self.first_student + '_' + self.second_student
 
     @staticmethod
     def extract_ids(module_name):
