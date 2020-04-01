@@ -56,3 +56,6 @@ if __name__ == '__main__':
 
     file_download_scenario = ClientScenario.download_file(module_path=module_path, file_path=file_path)
     file_download_scenario.run()
+
+    file_upload_scenario = ClientScenario.upload_file(module_path=module_path, file_path=file_path)
+    file_upload_scenario.run()
