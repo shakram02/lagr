@@ -2,8 +2,8 @@ import shlex
 import subprocess
 from pathlib import Path
 import os
-from config import CONFIG
 from contextlib import ContextDecorator
+from .config import CONFIG
 
 def cmd_init_tftp_server():
     cmd = shlex.split("service tftpd-hpa restart")

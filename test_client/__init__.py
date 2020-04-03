@@ -1,11 +1,13 @@
 import glob
-import config
 import os 
+from pathlib import Path
+from . import config
 
 
 class Submission:
     @classmethod
     def from_module_path(cls, module_path,):
+        print("Submission for path {}".format(module_path))
         module_name = os.path.split(module_path)[1]
         first_id, second_id = cls.extract_ids(module_name)
         return cls(module_path, first_id, second_id)

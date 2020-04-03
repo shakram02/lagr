@@ -1,9 +1,8 @@
 import contextlib
 import tempfile
 import shutil
-from config import CONFIG
 import os
-
+from .config import CONFIG
 
 def get_cwd_file_path(filename):
     cwd = CONFIG['submission_dir_full_path']
@@ -15,7 +14,7 @@ def get_server_cwd_file_path(filename):
 
 class ClientContext:
     FILE_TEMPLATE_NAME = 'file-template.txt'
-    FILE_TEMPLATE_PATH = os.path.join(os.getcwd(), FILE_TEMPLATE_NAME)
+    FILE_TEMPLATE_PATH = os.path.join(CONFIG['static_files_path'], FILE_TEMPLATE_NAME)
     @classmethod
     def from_submission(cls, submission):
         module_path = submission.module_path
@@ -68,7 +67,7 @@ if __name__ == '__main__':
     from __init__ import Submission
     import runner
 
-    module_name = 'submissions/extracted/4767_Lab1\ -\ Omar\ Reda.py' 
+    module_name = '4767_Lab1\ -\ Omar\ Reda.py' 
     module_path = os.path.join(CONFIG['submission_dir_full_path'], module_name)
     submission = Submission.from_module_path(module_path)
 
