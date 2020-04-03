@@ -21,8 +21,13 @@ class Submission:
     @staticmethod
     def extract_ids(module_name):
         before_hyphen, _ = module_name.split('-')
-        first_id, second_id, _ = before_hyphen.split('_')
-        return first_id, second_id
+        splitted = before_hyphen.split('_')
+        if len(splitted) > 2:
+            first_id, second_id, _ = splitted
+            return first_id, second_id
+        elif len(splitted) == 2:
+            first_id, _ = splitted
+            return first_id, ''
 
 
 def submissions_from_directory(submission_dir_full_path):
