@@ -26,7 +26,6 @@ class Submission:
 
 
 def submissions_from_directory(submission_dir_full_path):
-    return [
-        Submission.from_module_path(module_path) 
-        for module_path in glob.glob(submission_dir_full_path)
-    ]
+    dir_path = Path(submission_dir_full_path)
+    for module_path in dir_path.iterdir():
+        yield Submission.from_module_path(module_path)
