@@ -12,7 +12,9 @@ if __name__ == '__main__':
         config['submission_dir_full_path']
     )
     for submission in submissions_iter:
-        with context.ClientContext.from_submission(submission) as ctx:
+        ctx = context.ClientContext.from_submission(submission)
+        with test_client.grader.Grader(ctx) as grdr: 
+            grdr.register(test_client.grader.expect_wrong_socket)
             download_scenario = runner.ClientScenario.download_file(
                 ctx.module_path,
                 ctx.downloadable_file
