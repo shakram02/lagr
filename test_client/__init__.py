@@ -22,7 +22,11 @@ class Submission:
 
     @staticmethod
     def extract_ids(module_name):
-        before_hyphen, _ = module_name.split('-')
+        try:
+            before_hyphen, _ = module_name.split('-')
+        except ValueError:
+            before_hyphen = module_name
+
         splitted = before_hyphen.split('_')
         if len(splitted) > 2:
             first_id, second_id, _ = splitted
@@ -33,6 +37,6 @@ class Submission:
 
 
 def submissions_from_directory(submission_dir_full_path):
-    dir_path = Path(submission_dir_full_path)
-    for module_path in dir_path.iterdir():
+    paths = Path(submission_dir_full_path).resolve().glob("*.py")
+    for module_path in filter( lambda path: path.is_file, paths):
         yield Submission.from_module_path(module_path)
