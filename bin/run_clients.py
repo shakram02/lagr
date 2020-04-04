@@ -17,4 +17,9 @@ if __name__ == '__main__':
                 ctx.module_path,
                 ctx.downloadable_file
             )
-            download_scenario.run()
+            upload_scenario = runner.ClientScenario.upload_file(
+                ctx.module_path,
+                ctx.uploadable_file,
+            )
+            run = download_scenario.run()
+            pass

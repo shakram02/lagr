@@ -16,17 +16,18 @@ class ClientScenario:
 
     @classmethod
     def download_file(cls, *args, **kwargs):
-        cls.action = 'pull'
+        kwargs['action'] = "pull"
         return cls(*args, **kwargs)
 
     @classmethod
     def upload_file(cls, *args, **kwargs):
-        cls.action = 'push'
+        kwargs['action'] = "push"
         return cls(*args, **kwargs)
 
-    def __init__(self, module_path, file_path):
-        self.module_path = module_path
+    def __init__(self, module_path, file_path, action):
+        self.module_path = str(module_path).replace(' ', '\ ')
         self.file_path = file_path
+        self.action = action
 
     def cmd_action(self,):
         cmd = shlex.split("python {module_path} 127.0.0.1 {action} {filename}".format(
@@ -42,7 +43,8 @@ class ClientScenario:
         return os.path.split(self.file_path)[1]
 
     def run(self):
-        run_cmd(cmd_init_tftp_server()) and run_cmd(self.cmd_action())
+        run_cmd(cmd_init_tftp_server()) 
+        return run_cmd(self.cmd_action())
 
 
 def run_cmd(cmd):
