@@ -2,6 +2,8 @@ import shlex
 import subprocess
 from pathlib import Path
 import os
+import traceback
+import runpy
 from contextlib import ContextDecorator
 from .config import CONFIG
 
@@ -25,31 +27,51 @@ class ClientScenario:
         return cls(*args, **kwargs)
 
     def __init__(self, module_path, file_path, action):
-        self.module_path = str(module_path).replace(' ', '\ ')
+        self.module_path = module_path
         self.file_path = file_path
         self.action = action
 
     def cmd_action(self,):
-        cmd = shlex.split("python {module_path} 127.0.0.1 {action} {filename}".format(
-            filename=self.file_name,
-            module_path=Path(self.module_path),
-            action =self.action
-        ))
-        print(cmd)
-        return cmd
+        import sys
+        sys.argv.append('127.0.0.1')
+        sys.argv.append(self.action)
+        sys.argv.append(self.file_name)
+        init_globals = {'sys': sys}
+        return run_module(
+            str(self.module_path),
+            init_globals,
+        )
     
+    @property
+    def module_path_escaped(self):
+        return str(self.module_path).replace(' ', '\ ')
+
     @property
     def file_name(self):
         return os.path.split(self.file_path)[1]
 
     def run(self):
         run_cmd(cmd_init_tftp_server()) 
-        return run_cmd(self.cmd_action())
+        return self.cmd_action()()
 
 
 def run_cmd(cmd):
     print("RUNNING CMD > {}".format(cmd))
-    return subprocess.run(cmd,)
+    try:
+        comp =  subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as err:
+        tb = traceback.format_exc()
+        print(tb)
+
+def run_module(module_path, init_globals):
+    def lazy_execution():
+        run_name = '__main__'
+        runpy.run_path(
+            module_path, 
+            init_globals=init_globals,
+            run_name=run_name)
+    return lazy_execution
+
 
 if __name__ == '__main__':
     module_name ='4614_4651_lab1\ -\ Khaled\ Gewily.py' 

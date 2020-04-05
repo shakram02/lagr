@@ -55,11 +55,11 @@ class ClientContext:
         return self
 
     def __exit__(self, excpetion_type, excetion_value, traceback):
-            self._do_remove_file(self.downloadable_file)
-            self._do_remove_file(self.uploadable_file)
-            # Remove file of side effects that were downloaded and uploaded
-            self._do_remove_file(self.downloaded_file, catch_exception=True)
-            self._do_remove_file(self.uploaded_file, catch_exception=True)
+        self._do_remove_file(self.downloadable_file)
+        self._do_remove_file(self.uploadable_file)
+        # Remove file of side effects that were downloaded and uploaded
+        self._do_remove_file(self.downloaded_file, catch_exception=True)
+        self._do_remove_file(self.uploaded_file, catch_exception=True)
 
 
 
