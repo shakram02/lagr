@@ -12,16 +12,17 @@ config = test_client.config.CONFIG
 submissions_iter = list(test_client.submissions_from_directory(
     config['submission_dir_full_path']))
 
-def timeout():
+@pytest.fixture(autouse=True)
+def timeout(func=None):
     def handler(signum, frame):
         raise TimeoutError
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(3)
 
 
+
 @pytest.mark.parametrize('submission', submissions_iter)
 def test_submission(submission):
-    timeout()
     ctx = context.ClientContext.from_submission(submission)
     download_scenario = runner.ClientScenario.download_file(
         ctx.module_path,
