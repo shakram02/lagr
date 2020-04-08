@@ -33,6 +33,7 @@ class ClientScenario:
 
     def cmd_action(self,):
         import sys
+        sys.argv = []
         sys.argv.append('127.0.0.1')
         sys.argv.append(self.action)
         sys.argv.append(self.file_name)
