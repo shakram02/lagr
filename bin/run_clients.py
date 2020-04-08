@@ -28,22 +28,30 @@ def test_submission(submission):
         ctx.module_path,
         ctx.downloadable_file
     )
-    run = download_scenario.run()
-
-@pytest.mark.parametrize('submission', submissions_iter)
-def test_download_scenario(submission):
-    ctx = context.ClientContext.from_submission(submission)
-    download_scenario = runner.ClientScenario.download_file(
-        ctx.module_path,
-        ctx.downloadable_file
-    )
-    run = download_scenario.run()
-
-@pytest.mark.parametrize('submission', submissions_iter)
-def test_upload_scenario(submission):
-    ctx = context.ClientContext.from_submission(submission)
     upload_scenario = runner.ClientScenario.upload_file(
         ctx.module_path,
         ctx.downloadable_file
     )
-    run = upload_scenario.run()
+    for scenario in [download_scenario, upload_scenario]:
+        scenario.run()
+
+@pytest.mark.parametrize('submission', submissions_iter)
+def test_download_file(submission):
+    with context.ClientContext.from_submission(submission) as ctx:
+        download_scenario = runner.ClientScenario.download_file(
+            ctx.module_path,
+            ctx.downloadable_file
+        )
+        run = download_scenario.run()
+        assert os.path.isfile(ctx.downloaded_file)
+
+@pytest.mark.parametrize('submission', submissions_iter)
+def test_upload_scenario(submission):
+    with context.ClientContext.from_submission(submission) as ctx:
+        ctx = context.ClientContext.from_submission(submission)
+        upload_scenario = runner.ClientScenario.upload_file(
+            ctx.module_path,
+            ctx.downloadable_file
+        )
+        assert os.path.isfile(ctx.uploaded_file)
+        run = upload_scenario.run()
