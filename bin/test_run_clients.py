@@ -21,19 +21,6 @@ def timeout(func=None):
 
 
 
-@pytest.mark.parametrize('submission', submissions_iter)
-def test_submission(submission):
-    ctx = context.ClientContext.from_submission(submission)
-    download_scenario = runner.ClientScenario.download_file(
-        ctx.module_path,
-        ctx.downloadable_file
-    )
-    upload_scenario = runner.ClientScenario.upload_file(
-        ctx.module_path,
-        ctx.downloadable_file
-    )
-    for scenario in [download_scenario, upload_scenario]:
-        scenario.run()
 
 @pytest.mark.parametrize('submission', submissions_iter)
 def test_download_file(submission):
@@ -51,7 +38,7 @@ def test_upload_scenario(submission):
         ctx = context.ClientContext.from_submission(submission)
         upload_scenario = runner.ClientScenario.upload_file(
             ctx.module_path,
-            ctx.downloadable_file
+            ctx.uploadable_file
         )
-        assert os.path.isfile(ctx.uploaded_file)
         run = upload_scenario.run()
+        assert os.path.isfile(ctx.uploadable_file)
