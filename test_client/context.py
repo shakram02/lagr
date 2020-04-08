@@ -5,7 +5,7 @@ import os
 from .config import CONFIG
 
 def get_cwd_file_path(filename):
-    cwd = CONFIG['submission_dir_full_path']
+    cwd = os.getcwd()
     return os.path.join(cwd, filename)
 
 def get_server_cwd_file_path(filename):
