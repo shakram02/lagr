@@ -73,17 +73,17 @@ class ClientContext:
         self._do_remove_file(self.uploaded_file, catch_exception=True)
 
 
-if __name__ == '__main__':
-    from __init__ import Submission
-    import runner
+# if __name__ == '__main__':
+#     from __init__ import Submission
+#     import runner
 
-    module_name = '4767_Lab1\ -\ Omar\ Reda.py'
-    module_path = os.path.join(CONFIG['submission_dir_full_path'], module_name)
-    submission = Submission.from_module_path(module_path)
+#     module_name = '4767_Lab1\ -\ Omar\ Reda.py'
+#     module_path = os.path.join(CONFIG['submission_dir_full_path'], module_name)
+#     submission = Submission.from_module_path(module_path)
 
-    with ClientContext.from_submission(submission) as ctx:
-        download_scenario = runner.ClientScenario.download_file(
-            ctx.module_path, ctx.downloadable_file)
-        download_scenario.run()
+#     with ClientContext.from_submission(submission) as ctx:
+#         download_scenario = runner.ClientScenario.download_file(
+#             ctx.module_path, ctx.downloadable_file)
+#         download_scenario.run()
 
 

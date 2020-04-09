@@ -1,7 +1,6 @@
 import glob
-import os 
+import os
 from pathlib import Path
-from . import config
 
 
 class Submission:
@@ -16,7 +15,7 @@ class Submission:
         self.module_path = module_path
         self.first_student = first_student
         self.second_student = second_student
-    
+
     def __str__(self):
         return self.first_student + '_' + self.second_student
 
@@ -36,7 +35,7 @@ class Submission:
             return first_id, ''
 
 
-def submissions_from_directory(submission_dir_full_path):
-    paths = Path(submission_dir_full_path).resolve().glob("*.py")
-    for module_path in filter( lambda path: path.is_file, paths):
+def submissions_from_directory(submission_dir):
+    paths = Path(submission_dir).resolve().glob("*.py")
+    for module_path in filter(lambda path: path.is_file, paths):
         yield Submission.from_module_path(module_path)

@@ -14,7 +14,7 @@ def cmd_init_tftp_server():
 class ClientScenario:
 
     SUBMISSIONS_PATH_ROOT = CONFIG['submission_dir_full_path']
-    FILE_DOWNLOAD_NAME = CONFIG['template_file_name']
+    FILE_DOWNLOAD_NAME = CONFIG['test_file_name']
 
     @classmethod
     def download_file(cls, *args, **kwargs):
@@ -78,7 +78,7 @@ def run_module(module_path, init_globals):
 if __name__ == '__main__':
     module_name ='4614_4651_lab1\ -\ Khaled\ Gewily.py' 
     module_path = os.path.join(CONFIG['submission_dir_full_path'], module_name)
-    file_path = os.path.join(os.getcwd(), CONFIG['template_file_name'])
+    file_path = os.path.join(os.getcwd(), CONFIG['test_file_name'])
 
     file_download_scenario = ClientScenario.download_file(module_path=module_path, file_path=file_path)
     file_download_scenario.run()
