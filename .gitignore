@@ -134,3 +134,8 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+
+# Submissions for 2020
+**/submissions/2020
+
+**/*-template.txt
