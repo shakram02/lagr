@@ -1,34 +1,30 @@
 // For format details, see https://aka.ms/vscode-remote/devcontainer.json or this file's README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.106.0/containers/docker-existing-dockerfile
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.106.0/containers/python-3
 {
-	"name": "Existing Dockerfile",
-
-	// Sets the run context to one level up instead of the .devcontainer folder.
+	"name": "CC451 Graders",
 	"context": "..",
-
-	// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 	"dockerFile": "../Dockerfile",
-
 	// Set *default* container specific settings.json values on container create.
-	"settings": { 
-		"terminal.integrated.shell.linux": null
+	"settings": {
+		"terminal.integrated.shell.linux": "/bin/zsh",
+		"python.pythonPath": "/usr/local/bin/python",
+		"python.linting.enabled": true,
+		"python.linting.pylintEnabled": true,
+		"python.linting.pylintPath": "/usr/local/bin/pylint"
 	},
-
 	// Add the IDs of extensions you want installed when the container is created.
-	"extensions": ["ms-python.python"]
-
+	"extensions": [
+		"ms-python.python"
+	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-
-	// Uncomment the next line to run commands after the container is created - for example installing git.
-	// "postCreateCommand": "apt-get update && apt-get install -y git",
-
-	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
-	// "runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
-
-	// Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-in-docker.
-	// "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
-
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "",
 	// Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
-	// "remoteUser": "vscode"
+	// I'm using this feature because using root in Docker makes the new files
+	// owned by root in the local filesystem which is very annoying.
+	// "remoteUser": "vscode",
+	// Same config as our Dockerfile
+	// "workspaceMount": "source=${localWorkspaceFolder},target=/cc451_graders,type=bind",
+	// "workspaceFolder": "/cc451_graders",
 }
