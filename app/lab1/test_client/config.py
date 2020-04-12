@@ -1,6 +1,6 @@
 # This root dir comes from VScode default mounting point.
 # https://code.visualstudio.com/docs/remote/containers#_devcontainerjson-reference
-ROOT_DIR = "/workspaces/2020-lab1"
+ROOT_DIR = "/workspaces/2020-lab1/app"
 
 CONFIG = {
     # This path comes from the fact that the Dockerfile mounts

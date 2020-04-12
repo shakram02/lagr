@@ -4,30 +4,53 @@ import test_client
 import sys
 import os
 import pytest
-import signal
+import shlex
+import subprocess
 
 sys.path.insert(0, os.getcwd())
+cmd = shlex.split("sudo service tftpd-hpa restart")
+subprocess.run(cmd, check=True)
 
 
 config = test_client.config.CONFIG
-submissions_iter = list(submission.submissions_from_directory(
-    config['submission_dir_full_path']))
+code_directory = config['submission_dir_full_path']
+
+# Assert that our paths and config are correct.
+assert os.path.isdir(code_directory), f"{code_directory} doesn't exist."
+assert len(os.listdir(code_directory)) != 0
+
+submissions = submission.submissions_from_directory(code_directory)
+submissions_iter = sorted(list(submissions), key=lambda s: s.module_path)
 
 
 def get_test_id(submission_val):
     return str(submission_val)
 
 
+def get_file_not_found_error(file_name):
+    return f"File not found. [{file_name}]"
+
+
 @pytest.mark.timeout(3)
 @pytest.mark.parametrize('submission', submissions_iter, ids=get_test_id)
 def test_download_file(submission):
     with context.ClientContext.from_submission(submission) as ctx:
+        assert os.path.isfile(
+            ctx.downloadable_file), "Downloadable file doesn't exist."
+        assert os.path.isfile(
+            ctx.module_path), f"Couldn't find module {ctx.module_path}"
+
         download_scenario = runner.ClientScenario.download_file(
             ctx.module_path,
             ctx.downloadable_file
         )
-        run = download_scenario.run()
-        assert os.path.isfile(ctx.downloaded_file)
+        try:
+            run = download_scenario.run()
+        except SystemExit:
+            print("Submission called: sys.exit()")
+
+        assert os.path.isfile(
+            ctx.downloaded_file), get_file_not_found_error(ctx.downloaded_file)
 
 
 @pytest.mark.timeout(3)
@@ -39,5 +62,11 @@ def test_upload_scenario(submission):
             ctx.module_path,
             ctx.uploadable_file
         )
-        run = upload_scenario.run()
-        assert os.path.isfile(ctx.uploadable_file)
+
+        try:
+            run = upload_scenario.run()
+        except SystemExit:
+            print("Submission called: sys.exit()")
+
+        assert os.path.isfile(
+            ctx.uploadable_file), get_file_not_found_error(ctx.uploadable_file)

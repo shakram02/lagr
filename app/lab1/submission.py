@@ -4,12 +4,11 @@ from pathlib import Path
 
 
 class Submission:
-    @classmethod
-    def from_module_path(cls, module_path,):
-        print("Submission for path {}".format(module_path))
+    @staticmethod
+    def from_module_path(module_path):
         module_name = os.path.split(module_path)[1]
-        first_id, second_id = cls.extract_ids(module_name)
-        return cls(module_path, first_id, second_id)
+        first_id, second_id = Submission.extract_ids(module_name)
+        return Submission(module_path, first_id, second_id)
 
     def __init__(self, module_path, first_student, second_student):
         self.module_path = module_path
@@ -17,7 +16,14 @@ class Submission:
         self.second_student = second_student
 
     def __str__(self):
-        return self.first_student + '_' + self.second_student
+        if self.second_student:
+            return self.first_student + '_' + self.second_student
+        else:
+            return self.first_student
+
+    def __repr__(self):
+        mod_name = os.path.basename(self.module_path)
+        return f"ID: {self.__str__()}\nFILE: {mod_name}"
 
     @staticmethod
     def extract_ids(module_name):
