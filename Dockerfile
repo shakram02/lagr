@@ -57,7 +57,9 @@ RUN apt-get update \
 COPY app/lab1/configs/server.config /etc/default/tftpd-hpa
 
 RUN chown -R tftp /srv/tftp
-RUN chown $USERNAME /srv/tftp
+RUN chown $USERNAME /srv/tftp \ 
+    && mkdir -p ${WORKSPACE_ROOT} \
+    && chown -R $USERNAME $WORKSPACE_ROOT
 
 WORKDIR ${WORKSPACE_ROOT}
 ADD app/scripts app/scripts

@@ -3,6 +3,7 @@ import tempfile
 import shutil
 import os
 from .config import CONFIG
+import app.lib.error_msgs as error_msgs
 
 
 def get_cwd_file_path(filename):
@@ -33,8 +34,8 @@ class ClientContext:
         self.file_prefix = file_prefix
         download_file_name = file_prefix + '_download_' + self.FILE_TEMPLATE_NAME
         upload_file_name = file_prefix + '_upload_' + self.FILE_TEMPLATE_NAME
-        self.downloadable_file = get_server_cwd_file_path(download_file_name)
-        self.uploadable_file = get_cwd_file_path(upload_file_name)
+        self.download_template = get_server_cwd_file_path(download_file_name)
+        self.upload_template = get_cwd_file_path(upload_file_name)
 
         # Downloaded/Uploaded file path after running the test case.
         self.downloaded_file = get_cwd_file_path(download_file_name)
@@ -42,8 +43,22 @@ class ClientContext:
 
     # Make the files available to the code to be tested.
     def render_file_templates(self,):
-        self._do_render_file_templates(self.uploadable_file)
-        self._do_render_file_templates(self.downloadable_file)
+        self._do_render_file_templates(self.upload_template)
+        self.upload_template_length = os.path.getsize(self.upload_template)
+        self._do_render_file_templates(self.download_template)
+        self.download_template_length = os.path.getsize(self.download_template)
+
+    def check_downloaded_file(self):
+        err = error_msgs.get_file_not_found_error(self.downloaded_file)
+        assert os.path.isfile(self.downloaded_file), err
+        assert self.download_template_length == os.path.getsize(
+            self.downloaded_file)
+
+    def check_uploaded_file(self):
+        err = error_msgs.get_file_not_found_error(self.uploaded_file)
+        assert os.path.isfile(self.uploaded_file), err
+        assert self.upload_template_length == os.path.getsize(
+            self.uploaded_file)
 
     def _do_render_file_templates(self, target_path):
         shutil.copy(self.FILE_TEMPLATE_PATH, target_path)
@@ -66,8 +81,8 @@ class ClientContext:
 
     # Tear down the test environment.
     def __exit__(self, excpetion_type, excetion_value, traceback):
-        self._do_remove_file(self.downloadable_file)
-        self._do_remove_file(self.uploadable_file)
+        self._do_remove_file(self.download_template)
+        self._do_remove_file(self.upload_template)
         # Remove file of side effects that were downloaded and uploaded
         self._do_remove_file(self.downloaded_file, catch_exception=True)
         self._do_remove_file(self.uploaded_file, catch_exception=True)
@@ -83,7 +98,5 @@ class ClientContext:
 
 #     with ClientContext.from_submission(submission) as ctx:
 #         download_scenario = runner.ClientScenario.download_file(
-#             ctx.module_path, ctx.downloadable_file)
+#             ctx.module_path, ctx.download_template)
 #         download_scenario.run()
-
-

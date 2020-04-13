@@ -29,14 +29,21 @@ class ClientScenario:
     def file_name(self):
         return os.path.split(self.file_path)[1]
 
-    def run(self):
+    def run(self, modules=None):
+        if modules is None:
+            modules = {}
         import sys
         sys.argv = []
         sys.argv.append("placeholder")
         sys.argv.append('127.0.0.1')
         sys.argv.append(self.action)
         sys.argv.append(self.file_name)
+
+        # Load patched modules if any.
+        for k, v in modules.items():
+            sys.modules[k] = v
         init_globals = {'sys': sys}
+
         module_runner = run_module(
             str(self.module_path),
             init_globals,
