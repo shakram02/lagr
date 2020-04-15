@@ -62,15 +62,17 @@ RUN chown $USERNAME /srv/tftp \
     && chown -R $USERNAME $WORKSPACE_ROOT
 
 WORKDIR ${WORKSPACE_ROOT}
+
 ADD app/scripts app/scripts
 ADD app/requirements.txt app/requirements.txt
 
 RUN chown -R $USERNAME ${WORKSPACE_ROOT}
 
-RUN su - $USERNAME -c "zsh ${WORKSPACE_ROOT}/app/scripts/setup_environment.sh"
-RUN su - $USERNAME -c "pip install -r ${WORKSPACE_ROOT}/app/requirements.txt"
-
 USER $USERNAME
+
+RUN  zsh ${WORKSPACE_ROOT}/app/scripts/setup_environment.sh &&\
+     pip install -r ${WORKSPACE_ROOT}/app/requirements.txt --user --no-cache-dir
+
 # Switch back to dialog for any ad-hoc use of apt-get
 ENV DEBIAN_FRONTEND=dialog
 
