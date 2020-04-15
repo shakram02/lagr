@@ -19,7 +19,7 @@
 # pytest --tb=line    # only one line per failure
 # pytest --tb=native  # Python standard library formatting
 # pytest --tb=no      # no traceback at all
-pytest -svv --tb=line -n 4 -r p -k download app/lab1/test_run_clients.py
-# pytest -svv --tb=long -k exp app/lab1/test_run_clients.py
-# echo "[LOG] Experiment reached an end..."
+# pytest -svv --tb=line -n 4 -r p -k download app/lab1/test_run_clients.py
+pytest -vv --tb=short -k exp_sending_rrq app/lab1/test_run_clients.py
+echo "[LOG] Experiment reached an end..."
 # pytest -svv -k download app/lab1/test_run_clients.py

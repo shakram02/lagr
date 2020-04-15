@@ -42,7 +42,7 @@ class ClientContext:
         self.uploaded_file = get_server_cwd_file_path(upload_file_name)
 
     # Make the files available to the code to be tested.
-    def render_file_templates(self,):
+    def render_file_templates(self):
         self._do_render_file_templates(self.upload_template)
         self.upload_template_length = os.path.getsize(self.upload_template)
         self._do_render_file_templates(self.download_template)
