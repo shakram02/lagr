@@ -56,8 +56,7 @@ RUN apt-get update \
 #TODO change the server.config to be embedded in the Dockerfile 
 COPY app/lab1/configs/server.config /etc/default/tftpd-hpa
 
-RUN chown -R tftp /srv/tftp
-RUN chown $USERNAME /srv/tftp \ 
+RUN chown -R tftp /srv/tftp\
     && mkdir -p ${WORKSPACE_ROOT} \
     && chown -R $USERNAME $WORKSPACE_ROOT
 
@@ -75,4 +74,3 @@ RUN  zsh ${WORKSPACE_ROOT}/app/scripts/setup_environment.sh &&\
 
 # Switch back to dialog for any ad-hoc use of apt-get
 ENV DEBIAN_FRONTEND=dialog
-

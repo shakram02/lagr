@@ -1,30 +1,26 @@
-import builtins
-from app.lab1.test_client import context, runner
-import app.lib.submission as submission
-import app.lab1.test_client as test_client
-from app.lib.fake_socket import FakeSocket, fake_socket_factory
-from app.lib.fake_fd import FakeFd, fake_open_fd_factory, setup_fake_fd_module
-import sys
 import os
-import pytest
-import struct
 import shlex
 import subprocess
 import socket
-import builtins
 import logging
-import io
-from enum import Enum
+import pytest
+import builtins
+import app.lib.submission as submission
+
+from app.lab1 import context, runner, config
+from app.lab1.config import TEST_TIMEOUT
+from app.lib.fake_socket import FakeSocket, fake_socket_factory
+from app.lib.fake_fd import FakeFd, fake_open_fd_factory, setup_fake_fd_module
+from app.lib.helpers import TerminateFail, TerminatePass, mark_test_pass
+from app.lab1.tftp_lib import Packet, TftpOpCodes
 from typing import Tuple, Callable
 
+config = config.CONFIG
+os.chdir(config['scratch_disk'])
+code_directory = config["client_submission_dir_full_path"]
 
-sys.path.insert(0, os.getcwd())
 cmd = shlex.split("sudo service tftpd-hpa restart")
 subprocess.run(cmd, check=True)
-
-
-config = test_client.config.CONFIG
-code_directory = config['submission_dir_full_path']
 
 # Assert that our paths and config are correct.
 assert os.path.isdir(code_directory), f"{code_directory} doesn't exist."
@@ -32,222 +28,348 @@ assert len(os.listdir(code_directory)) != 0
 
 submissions = submission.submissions_from_directory(code_directory)
 submissions_iter = sorted(list(submissions), key=lambda s: s.module_path)
-# test_module_path = "/workspaces/2020-lab1/app/lab1/submissions/2020/1111_2222_lab1.py"
+# test_module_path = "/workspaces/2020-lab1/app/lab1/submissions/2020/4777_4914_lab1 - Nourane Elwazane.py"
 # submissions_iter = [submission.Submission.from_module_path(test_module_path)]
 
 setup_fake_fd_module(code_directory)
-
-
-def get_test_id(submission_val):
-    return str(submission_val)
 
 
 def get_file_not_found_error(file_name):
     return f"File not found. [{file_name}]"
 
 
-@pytest.mark.timeout(3)
-@pytest.mark.parametrize('submission', submissions_iter, ids=get_test_id)
-def test_download_file(caplog, monkeypatch, submission):
-    with context.ClientContext.from_submission(submission) as ctx:
-        assert os.path.isfile(
-            ctx.download_template), "Downloadable file doesn't exist."
-        assert os.path.isfile(
-            ctx.module_path), f"Couldn't find module {ctx.module_path}"
+@pytest.mark.parametrize('submission', submissions_iter, ids=submission.get_test_id)
+@pytest.mark.timeout(TEST_TIMEOUT)
+class TestTftpClientRx:
+    def test_upload_file(self, submission):
+        with context.ClientContext.from_submission(submission) as ctx:
+            upload_scenario = runner.ClientScenario.upload_file(
+                ctx.module_path,
+                ctx.upload_template
+            )
 
-        download_scenario = runner.ClientScenario.download_file(
-            ctx.module_path,
-            ctx.download_template
-        )
-        try:
-            run = download_scenario.run()
-        except SystemExit:
-            logging.warning("Submission called: sys.exit()")
+            try:
+                run = upload_scenario.run()
+            except SystemExit:
+                logging.warning("Submission called: sys.exit()")
 
-        ctx.check_downloaded_file()
+            ctx.check_uploaded_file()
 
+    def test_client_should_send_err(self, caplog, monkeypatch, submission):
+        """
+        Test that the code sends an ACK after the first data
+        """
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            return (b"\x00\xff\x00\x01", address)
 
-@pytest.mark.timeout(3)
-@pytest.mark.parametrize('submission', submissions_iter, ids=get_test_id)
-def test_upload_file(submission):
-    with context.ClientContext.from_submission(submission) as ctx:
-        ctx = context.ClientContext.from_submission(submission)
-        upload_scenario = runner.ClientScenario.upload_file(
-            ctx.module_path,
-            ctx.upload_template
-        )
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
 
-        try:
-            run = upload_scenario.run()
-        except SystemExit:
-            logging.warning("Submission called: sys.exit()")
+            if p.opcode == TftpOpCodes.RRQ:
+                fname = f"{submission}_download_file-template.txt"
+                injected = Packet.make_rrq(fname)
+                logging.debug(f"[>] Sending: {injected} to {address}")
+                assert test_sock.sendto_count == 1
+                return (Packet.serialize_packet(injected), address)
 
-        ctx.check_uploaded_file()
+            # In this test case, the code should send an error.
+            # since we sent a malformed packet.
+            if test_sock.sendto_count == 2:
+                assert p.opcode == TftpOpCodes.ERROR
+                mark_test_pass()
 
+            if test_sock.sendto_count > 2:
+                raise TerminateFail("Expected an ERROR packet")
 
-class TftpOpCodes(Enum):
-    RRQ = b"\x00\x01"
-    WRQ = b"\x00\x02"
-    DATA = b"\x00\x03"
-    ACK = b"\x00\x04"
-    ERROR = b"\x00\x05"
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
 
+        with context.ClientContext.from_submission(submission) as ctx:
+            download_scenario = runner.ClientScenario.download_file(
+                ctx.module_path,
+                ctx.download_template
+            )
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
 
-class Packet(object):
-    STRIDE_SIZE = 512
+                try:
+                    run = download_scenario.run()
+                except SystemExit:
+                    pass
+                except TerminatePass:
+                    pass
 
-    def __init__(self, opcode: TftpOpCodes):
-        self.opcode = opcode
+    def test_client_can_receive_err(self, caplog, monkeypatch, submission):
+        """
+        Test that the code sends an ACK after the first data
+        """
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            p = Packet.make_err(1, "Operation failed.")
+            return (Packet.serialize_err_packet(p), address)
 
-    def __repr__(self):
-        if self.opcode == TftpOpCodes.RRQ or self.opcode == TftpOpCodes.WRQ:
-            return f"{self.opcode.name} FNAME: {self.fname} MODE: {self.mode}"
-        elif self.opcode == TftpOpCodes.DATA:
-            return f"DATA #{self.blk} LEN: [{len(self.data)}]"
-        elif self.opcode == TftpOpCodes.ACK:
-            return f"ACK #{self.blk}"
-        elif self.opcode == TftpOpCodes.ERROR:
-            return f"ERR ERRCODE: {self.err_code} MSG: {self.err_msg}"
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
 
-    def __str__(self):
-        return self.__repr__()
+            if p.opcode == TftpOpCodes.RRQ:
+                fname = f"{submission}_download_file-template.txt"
+                injected = Packet.make_rrq(fname)
+                logging.debug(f"[>] Sending: {injected} to {address}")
+                assert test_sock.sendto_count == 1
+                return (Packet.serialize_packet(injected), address)
+            else:
+                raise TerminateFail("Didn't terminate on Error.")
 
-    @staticmethod
-    def parse_packet_bytes(packet_bytes):
-        opcode = TftpOpCodes(packet_bytes[:2])
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
 
-        if opcode == TftpOpCodes.RRQ or opcode == TftpOpCodes.WRQ:
-            return Packet.parse_rq_bytes(packet_bytes)
-        elif opcode == TftpOpCodes.DATA:
-            return Packet.parse_data_bytes(packet_bytes)
-        elif opcode == TftpOpCodes.ACK:
-            return Packet.parse_ack_bytes(packet_bytes)
-        elif opcode == TftpOpCodes.ERROR:
-            return Packet.parse_err_bytes(packet_bytes)
-
-    @staticmethod
-    def parse_rq_bytes(rq_bytes: bytes):
-        p = Packet(TftpOpCodes(rq_bytes[:2]))
-
-        rq_bytes = rq_bytes[2:]
-        fname, mode = rq_bytes.split(b"\x00", 1)
-        p.fname = str(fname).strip()
-        p.mode = str(mode[:-1])
-
-        return p
-
-    @staticmethod
-    def parse_data_bytes(data_bytes: bytes):
-        p = Packet(TftpOpCodes(data_bytes[:2]))
-
-        p.blk = struct.unpack("!H", data_bytes[2:4])[0]
-        p.data = data_bytes[4:]
-        p.last = len(p.data) < Packet.STRIDE_SIZE
-
-        if len(p.data) > Packet.STRIDE_SIZE:
-            raise ValueError("Invalid data size.")
-
-        return p
-
-    @staticmethod
-    def parse_ack_bytes(ack_bytes: bytes):
-        p = Packet(TftpOpCodes(ack_bytes[:2]))
-        p.blk = struct.unpack("!H", ack_bytes[2:])[0]
-
-        return p
-
-    @staticmethod
-    def parse_err_bytes(err_bytes: bytes):
-        p = Packet(TftpOpCodes(err_bytes[:2]))
-
-        p.err_code = err_bytes[2:4]
-        p.err_msg = err_bytes[4:-1]
-
-        return p
-
-    @staticmethod
-    def serialize_packet(packet) -> bytes:
-        if packet.opcode == TftpOpCodes.RRQ or packet.opcode == TftpOpCodes.WRQ:
-            return Packet.serialize_rq_packet(packet)
-        elif packet.opcode == TftpOpCodes.DATA:
-            return Packet.serialize_data_packet(packet)
-        elif packet.opcode == TftpOpCodes.ACK:
-            return Packet.serialize_ack_packet(packet)
-        elif packet.opcode == TftpOpCodes.ERROR:
-            return Packet.serialize_err_packet(packet)
-
-    @staticmethod
-    def serialize_rq_packet(packet) -> bytes:
-        buffer = bytearray()
-
-        buffer.append(struct.pack("!H", packet.opcode))
-        buffer.append(bytes(packet.fname, "UTF-8"))
-        buffer.append(0)
-        buffer.append(bytes("octet", "UTF-8"))
-        buffer.append(0)
-
-        return bytes(buffer)
-
-    @staticmethod
-    def serialize_data_packet(packet) -> bytes:
-        buffer = bytearray()
-        buffer.append(struct.pack("!HH", packet.opcode, packet.blk))
-        buffer.append(packet.data)
-
-        return bytes(buffer)
-
-    @staticmethod
-    def serialize_ack_packet(packet) -> bytes:
-        buffer = bytearray()
-        buffer.append(struct.pack("!HH", packet.opcode, packet.blk))
-
-        return bytes(buffer)
-
-    @staticmethod
-    def serialize_err_packet(packet) -> bytes:
-        buffer = bytearray()
-        buffer.append(struct.pack("!HH", packet.opcode, packet.err_code))
-        buffer.append(bytes(packet.err_msg, "UTF-8"))
-        buffer.append(0)
-
-        return bytes(buffer)
-
-
-@pytest.mark.timeout(3)
-@pytest.mark.parametrize('submission', submissions_iter, ids=get_test_id)
-def test_exp_sending_rrq(caplog, monkeypatch, submission):
-    caplog.set_level(logging.DEBUG)
-    socket_builder, test_sock = fake_socket_factory(transparent=True)
-
-    def on_sendto(data, address):
-        plog = str(Packet.parse_packet_bytes(data))
-        logging.debug(f"Sending: {plog} to {address}")
-
-    def on_recvfrom(recv_data):
-        data, address = recv_data
-        logging.debug(f"Reciving from {address}")
-        pass
-
-    test_sock.on_sendto = on_sendto
-    test_sock.on_recvfrom = on_recvfrom
-
-    # GO!
-    with monkeypatch.context() as m:
-
-        m.setattr(socket, "socket", socket_builder)
-        m.setattr(builtins, "open", fake_open_fd_factory)
-
-        # Inject our monkeypatched socket module
-        modules = {'socket': socket}
         with context.ClientContext.from_submission(submission) as ctx:
             download_scenario = runner.ClientScenario.download_file(
                 ctx.module_path,
                 ctx.download_template
             )
 
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
+
+                try:
+                    run = download_scenario.run()
+                except SystemExit:
+                    pass
+
+
+@pytest.mark.parametrize('submission', submissions_iter, ids=submission.get_test_id)
+@pytest.mark.timeout(TEST_TIMEOUT)
+class TestTftpClientTx:
+    @pytest.mark.parent
+    def test_download_file(self, caplog, monkeypatch, submission):
+        with context.ClientContext.from_submission(submission) as ctx:
+            assert os.path.isfile(
+                ctx.download_template), "Downloadable file doesn't exist."
+            assert os.path.isfile(
+                ctx.module_path), f"Couldn't find module {ctx.module_path}"
+
+            download_scenario = runner.ClientScenario.download_file(
+                ctx.module_path,
+                ctx.download_template
+            )
             try:
                 run = download_scenario.run()
             except SystemExit:
-                print("Submission called: sys.exit()")
+                logging.warning("Submission called: sys.exit()")
 
-            assert test_sock.sendto_count > 1
+            ctx.check_downloaded_file()
+
+    @pytest.mark.child
+    def test_client_send_rrq(self, caplog, monkeypatch, submission):
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
+
+            if p.opcode == TftpOpCodes.RRQ:
+                assert test_sock.sendto_count == 1
+                test_sock.assert_rrq = True
+                raise TerminatePass()
+            else:
+                raise TerminateFail("Expected an RRQ")
+
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            packet = Packet.parse_packet_bytes(data)
+            logging.debug(
+                f"RECV from {address}: [{len(data)}] byte(s) {str(packet)}")
+
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
+
+        with context.ClientContext.from_submission(submission) as ctx:
+            download_scenario = runner.ClientScenario.download_file(
+                ctx.module_path,
+                ctx.download_template
+            )
+            # GO!
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
+
+                try:
+                    run = download_scenario.run()
+                except TerminatePass:
+                    logging.debug("Passed")
+
+    @pytest.mark.child
+    def test_client_send_wrq(self, caplog, monkeypatch, submission):
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
+
+            if p.opcode == TftpOpCodes.WRQ:
+                assert test_sock.sendto_count == 1
+                test_sock.assert_wrq = True
+                raise TerminatePass()
+            else:
+                raise TerminateFail("Expected an WRQ")
+
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            packet = Packet.parse_packet_bytes(data)
+            logging.debug(
+                f"RECV from {address}: [{len(data)}] byte(s) {str(packet)}")
+
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
+
+        with context.ClientContext.from_submission(submission) as ctx:
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
+                upload_scenario = runner.ClientScenario.upload_file(
+                    ctx.module_path,
+                    ctx.upload_template
+                )
+
+                try:
+                    run = upload_scenario.run()
+                except TerminatePass:
+                    logging.debug("Passed")
+
+    @pytest.mark.child
+    def test_client_send_data(self, caplog, monkeypatch, submission):
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
+
+            if p.opcode == TftpOpCodes.WRQ:
+                fname = f"{submission}_upload_file-template.txt"
+                injected = Packet.make_wrq(fname)
+                logging.debug(f"[>] Sending: {injected} to {address}")
+                assert test_sock.sendto_count == 1
+                return (Packet.serialize_packet(injected), address)
+
+            # ACK is the second packet to be sent when receiving data.
+            if test_sock.sendto_count == 2:
+                assert p.opcode == TftpOpCodes.DATA
+                assert p.blk == 1
+                test_sock.pass_data = True
+                raise TerminatePass()
+
+            if test_sock.sendto_count > 2:
+                raise TerminateFail("Expected a DATA packet.")
+
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            packet = Packet.parse_packet_bytes(data)
+            logging.debug(
+                f"RECV from {address}: [{len(data)}] byte(s) {str(packet)}")
+
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
+
+        with context.ClientContext.from_submission(submission) as ctx:
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
+                upload_scenario = runner.ClientScenario.upload_file(
+                    ctx.module_path,
+                    ctx.upload_template
+                )
+
+                try:
+                    run = upload_scenario.run()
+                except TerminatePass:
+                    logging.debug("Passed")
+
+    def test_client_send_ack(self, caplog, monkeypatch, submission):
+        """
+        Test that the code sends an ACK after the first data
+        """
+        def on_recvfrom(test_sock, recv_data):
+            data, address = recv_data
+            packet = Packet.parse_packet_bytes(data)
+            logging.debug(
+                f"RECV {address}: [{len(data)}] byte(s) #{str(packet)}")
+
+        def on_sendto(test_sock, data, address):
+            p = Packet.parse_packet_bytes(data)
+            plog = str(p)
+            logging.debug(f"Sending: {plog} to {address}")
+
+            if p.opcode == TftpOpCodes.RRQ:
+                fname = f"{submission}_download_file-template.txt"
+                injected = Packet.make_rrq(fname)
+                logging.debug(f"[>] Sending: {injected} to {address}")
+                assert test_sock.sendto_count == 1
+                return (Packet.serialize_packet(injected), address)
+
+            # ACK is the second packet to be sent when receiving data.
+            if test_sock.sendto_count == 2:
+                assert p.opcode == TftpOpCodes.ACK
+                assert p.blk == 1
+                test_sock.pass_ack = True
+                raise TerminatePass()
+
+        caplog.set_level(logging.DEBUG)
+        socket_builder = fake_socket_factory(
+            on_sendto=on_sendto, on_recvfrom=on_recvfrom, transparent=True)
+
+        with context.ClientContext.from_submission(submission) as ctx:
+            download_scenario = runner.ClientScenario.download_file(
+                ctx.module_path,
+                ctx.download_template
+            )
+            with monkeypatch.context() as m:
+                m.setattr(socket, "socket", socket_builder)
+                try:
+                    run = download_scenario.run()
+                except TerminatePass:
+                    pass
+
+
+# TODO: make a test for using select/asyncio
+# def test_uses_select(self, caplog, monkeypatch, submission):
+#     """
+#     Test that the code sends an ACK after the first data
+#     """
+
+#     caplog.set_level(logging.DEBUG)
+
+
+# @pytest.mark.timeout(TEST_TIMEOUT)
+# @pytest.mark.parametrize('submission', submissions_iter, ids=submission.get_test_id)
+# def test_exp_writing_correct_data(caplog, monkeypatch, submission):
+#     caplog.set_level(logging.DEBUG)
+#     ffd_builder, fake_fd = fake_open_fd_factory()
+
+#     def on_read(n=-1):
+#         logging.debug("ON READ")
+#         pass
+
+#     def on_write(s):
+#         logging.debug(f"ON WRITE [{s}]")
+#         pass
+
+#     fake_fd.on_read = on_read
+#     fake_fd.on_write = on_write
+
+#     with context.ClientContext.from_submission(submission) as ctx:
+#         with monkeypatch.context() as m:
+#             m.setattr(builtins, "open", ffd_builder)
+#             upload_scenario = runner.ClientScenario.upload_file(
+#                 ctx.module_path,
+#                 ctx.upload_template
+#             )
+
+#             try:
+#                 run = upload_scenario.run()
+#             except TerminatePass:
+#                 logging.debug("Passed")

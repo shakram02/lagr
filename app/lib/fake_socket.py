@@ -3,6 +3,8 @@ import socket
 from typing import Tuple, Callable
 unpatched_socket_constructor = socket.socket
 
+SOCK_TIMEOUT = 3
+
 
 class FakeSocket(object):
     """
@@ -10,49 +12,89 @@ class FakeSocket(object):
     """
 
     def __init__(self, address_family, socket_type, transparent=False):
+        self.ip_addr = ""
+        self.port = 0
         self.sendto_count = 0
+        self.recvfrom_count = 0
         self.recv_buffer = []
-        self.send_buffer = []
         self.on_sendto = None
         self.on_recvfrom = None
+        self.on_close = None
         self.transparent = transparent
         self.address_family = address_family
         self.socket_type = socket_type
         self.sys_sock_constructor = unpatched_socket_constructor
         if self.transparent:
-            self.sock = self.sys_sock_constructor(address_family, socket_type)
+            self.to_transparent()
 
     def sendto(self, data, address):
         self.sendto_count += 1
-        self.send_buffer.append((data, address))
 
         if self.on_sendto is not None:
-            self.on_sendto(data, address)
+            injected_packet = self.on_sendto(self, data, address)
+            # If there's a custom packet to be sent.
+            if injected_packet is not None and self.transparent:
+                return self.sock.sendto(*injected_packet)
 
         if self.transparent:
-            self.sock.sendto(data, address)
+            return self.sock.sendto(data, address)
 
     def recvfrom(self, buffsize):
+        self.recvfrom_count += 1
         if self.transparent:
             recv_packet = self.sock.recvfrom(buffsize)
         else:
-            recv_packet = self.recv_buffer.pop(0)
-            data, address = recv_packet
-
-            if len(data) < buffsize:
-                raise SystemError(
-                    "Buffer size is smaller than data, UDP packet will be discarded")
+            recv_packet = (None, None)
 
         if self.on_recvfrom is not None:
-            self.on_recvfrom(recv_packet)
+            injected = self.on_recvfrom(self, recv_packet)
+            if injected is not None:
+                return injected
+
+        data, address = recv_packet
+        if len(data) > buffsize:
+            raise SystemError(
+                "Buffer size is smaller than data, UDP packet will be discarded")
 
         return recv_packet
+
+    def bind(self, addr):
+        ip, port = addr
+        self.ip_addr = ip
+        self.port = port
+
+        logging.debug(f"BIND: {addr}")
+
+        if self.transparent:
+            # Break dependency between tests.
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sock.bind(addr)
 
     def settimeout(self, val):
         logging.debug(f"SET TIMEOUT: {val}")
 
     def close(self):
+        if self.transparent:
+            self.sock.close()
+        if self.on_close is not None:
+            self.on_close(self)
         logging.debug("CLOSE")
+
+    def setblocking(self, val):
+        # TODO: what should I do?
+        # report bonus.
+        pass
+
+    def fileno(self):
+        # For non-blocking socket.
+        if self.transparent:
+            return self.sock.fileno()
+        else:
+            raise RuntimeError(
+                "[GRADER ERROR] Can't have fileno of non-transparent socket")
+
+    def getsockname(self):
+        return f"{self.ip_addr}:{self.port}"
 
     def to_transparent(self):
         """
@@ -63,6 +105,7 @@ class FakeSocket(object):
         self.transparent = True
         self.sock = self.sys_sock_constructor(
             self.address_family, self.socket_type)
+        self.sock.settimeout(SOCK_TIMEOUT)
 
     def to_opaque(self):
         """
@@ -72,8 +115,15 @@ class FakeSocket(object):
         self.transparent = False
         del self.sock
 
+    def __del__(self):
+        if self.transparent:
+            try:
+                self.sock.close()
+            except Exception:
+                pass
 
-def fake_socket_factory(transparent=False) -> Tuple[Callable[[int, int], FakeSocket], FakeSocket]:
+
+def fake_socket_factory(on_sendto=None, on_recvfrom=None, transparent=False, on_close=None) -> Callable[[int, int], FakeSocket]:
     """
     Provides a ready socket with a builder.
 
@@ -81,24 +131,20 @@ def fake_socket_factory(transparent=False) -> Tuple[Callable[[int, int], FakeSoc
     to the socket used during the test, to be able
     to extract information about its usage.
     """
+    def f(family=socket.AF_INET, type=socket.SOCK_STREAM):
+        nonlocal transparent
+        nonlocal on_recvfrom
+        nonlocal on_sendto
+        # Provide the unpatched constructor to the
+        # object incase it needs to be transparent.
+        # otherwise the patched constructor will be
+        # used and which will cause infinite recursion.
+        test_sock = FakeSocket(family, type, transparent)
+        test_sock.on_recvfrom = on_recvfrom
+        test_sock.on_sendto = on_sendto
+        test_sock.on_close = on_close
 
-    # Provide the unpatched constructor to the
-    # object incase it needs to be transparent.
-    # otherwise the patched constructor will be
-    # used and which will cause infinite recursion.
-    test_sock = FakeSocket(-1, -1)
-
-    def f(af, sock):
-        logging.debug(f"CONSTRUCT {af} {sock}")
-        test_sock.address_family = af
-        test_sock.socket_type = sock
-        # This is called here because the initalization
-        # of the socket outside this function will make
-        # -1, -1 the AF_ and SOCK_ values which are
-        # invalid.
-        if transparent:
-            test_sock.to_transparent()
+        logging.debug(f"CONSTRUCT {family} {type}")
         return test_sock
 
-    return f, test_sock
-
+    return f

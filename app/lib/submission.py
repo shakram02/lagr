@@ -23,7 +23,7 @@ class Submission:
 
     def __repr__(self):
         mod_name = os.path.basename(self.module_path)
-        return f"ID: {self.__str__()}\nFILE: {mod_name}"
+        return f"ID: {self.__str__()} @ FILE: {mod_name}"
 
     @staticmethod
     def extract_ids(module_name):
@@ -45,3 +45,7 @@ def submissions_from_directory(submission_dir):
     paths = Path(submission_dir).resolve().glob("*.py")
     for module_path in filter(lambda path: path.is_file, paths):
         yield Submission.from_module_path(module_path)
+
+
+def get_test_id(submission: Submission):
+    return str(submission)

@@ -3,7 +3,9 @@ prev_codes/
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.csv
+**/scratch_disk/
+**/submissions/
 # C extensions
 *.so
 
