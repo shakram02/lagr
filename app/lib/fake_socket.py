@@ -10,6 +10,7 @@ class FakeSocket(object):
     """
     Defines a custom socket class that'll be used for testing.
     """
+    # pylint: disable=not-callable
 
     def __init__(self, address_family, socket_type, transparent=False):
         self.ip_addr = ""
@@ -20,6 +21,7 @@ class FakeSocket(object):
         self.on_sendto = None
         self.on_recvfrom = None
         self.on_close = None
+        self.on_recv = None
         self.transparent = transparent
         self.address_family = address_family
         self.socket_type = socket_type
@@ -55,6 +57,22 @@ class FakeSocket(object):
         if len(data) > buffsize:
             raise SystemError(
                 "Buffer size is smaller than data, UDP packet will be discarded")
+
+        return recv_packet
+
+    def recv(self, buffsize):
+        """
+        Returns data only.
+        """
+        if self.transparent:
+            recv_packet = self.sock.recv(buffsize)
+        else:
+            recv_packet = None
+
+        if self.on_recv is not None:
+            injected = self.on_recv(self, recv_packet)
+            if injected is not None:
+                return injected
 
         return recv_packet
 

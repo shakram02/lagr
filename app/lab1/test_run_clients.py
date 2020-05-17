@@ -26,9 +26,8 @@ subprocess.run(cmd, check=True)
 assert os.path.isdir(code_directory), f"{code_directory} doesn't exist."
 assert len(os.listdir(code_directory)) != 0
 
-submissions = submission.submissions_from_directory(code_directory)
-submissions_iter = sorted(list(submissions), key=lambda s: s.module_path)
-# test_module_path = "/workspaces/2020-lab1/app/lab1/submissions/2020/4777_4914_lab1 - Nourane Elwazane.py"
+submissions_iter = submission.submissions_from_directory(code_directory)
+# test_module_path = "/workspaces/2020-lab1/app/lab1/submissions/2020/client/4617_4762_lab1 - Fayez Elmassry.py"
 # submissions_iter = [submission.Submission.from_module_path(test_module_path)]
 
 setup_fake_fd_module(code_directory)

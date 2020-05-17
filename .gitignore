@@ -6,6 +6,7 @@ __pycache__/
 *.csv
 **/scratch_disk/
 **/submissions/
+app/results/
 # C extensions
 *.so
 
