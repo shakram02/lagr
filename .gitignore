@@ -3,6 +3,8 @@ prev_codes/
 __pycache__/
 *.py[cod]
 *$py.class
+*.txt
+!requirements.txt
 *.csv
 **/scratch_disk/
 **/submissions/

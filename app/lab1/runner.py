@@ -9,8 +9,6 @@ import subprocess
 import multiprocessing
 import sys
 from app.lib.wrapped_process import WrappedProcess
-pytest_stderr = sys.stderr
-pytest_stdout = sys.stdout
 
 
 class ServerScenario:

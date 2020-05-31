@@ -1,17 +1,12 @@
 import sys
 import logging
 import builtins
+from app.lib.helpers import is_called_from_submission_code
 # Keep an un-patched method reference to be
 # used by other system modules using open.
 # we'll dynamically patch depending on the
 # file that's calling open.
 upatched_open = builtins.open
-submission_directory = None
-
-
-def setup_fake_fd_module(cur_dir):
-    global submission_directory
-    submission_directory = cur_dir
 
 
 class FakeFd(object):
@@ -62,20 +57,16 @@ class FakeFd(object):
         logging.debug("EXIT file context")
 
 
-def fake_open_fd_factory():
-    ffd = FakeFd()
-
+def fake_open_fd_factory(submission_directory):
     def fake_open(file, mode="rb", newline=''):
-        caller_module_path: str = sys._getframe().f_back.f_code.co_filename
+        nonlocal submission_directory
+        if not is_called_from_submission_code(submission_directory):
+            return upatched_open(file, mode, newline)
 
-        if caller_module_path.startswith(submission_directory):
-            # Double check config is correct.
-            assert submission_directory is not None
-            # Return the function to be used by the
-            # patched code.
-            return ffd.open(file, mode, newline)
-        else:
-            # System modules.
-            return upatched_open(file, mode)
+        ffd = FakeFd()
+        # Return the function to be used by the
+        # patched code.
+        return ffd.open(file, mode, newline)
 
+    # TODO: send self in hooks. Don't return the ffd here.
     return fake_open, ffd
