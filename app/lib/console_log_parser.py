@@ -1,3 +1,4 @@
+from datetime import datetime
 from app_config import YEAR, ROOT_DIR
 import csv
 import os
@@ -110,8 +111,8 @@ def write_report(accumulator: dict, file_path):
     When a multiplier is used, it's applied
     to the total.
     """
-    def get_percentage(passed, total):
-        return round((passed/total), 2)
+    def get_percentage(passed, total, multiplier):
+        return round((passed/total)*multiplier, 2)
 
     csv_array = []
     passed_statistics = []
@@ -130,19 +131,20 @@ def write_report(accumulator: dict, file_path):
 
         passed_statistics.append(passed)
         csv_array.append(student_case_info)
-        inline_summary = [["OK", passed]]
+        inline_summary = []
 
         # Apply scaling. (for late & cheaters)
         if MULTIPLIER == 1:
-            inline_summary.append(["TOTAL", total])
+            inline_summary.append(["OK", passed])
         else:
             inline_summary.append(
-                [f"TOTAL (x {MULTIPLIER})", total * MULTIPLIER])
+                [f"Ok (x {MULTIPLIER})", total * MULTIPLIER])
 
+        inline_summary.append(["TOTAL", total])
         csv_array.append(inline_summary)
         csv_array.append([[]])
 
-        percentage = get_percentage(passed, total)
+        percentage = get_percentage(passed, total, MULTIPLIER)
         report_summary.append((st_ids, percentage))
 
     arr = np.asarray(passed_statistics)
@@ -231,8 +233,9 @@ def main():
 
     # Don't use ROOT_DIR because it starts at root directory.
     # mkdir -p won't work.
+    now = datetime.now()
     result_dir = f"{ROOT_DIR}/results/{YEAR}/lab_{lab_number}/{grader_name}"
-    timestamp = time.strftime("%d_%m_%Y_%H_%M_%S")
+    timestamp = now.strftime("%Y%m%d%H%M%S")
 
     print(f"[LOG] Root directory:", result_dir)
     os.system(f"sudo mkdir -p {result_dir}")
